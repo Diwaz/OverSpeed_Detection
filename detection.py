@@ -1,15 +1,17 @@
 import numpy as np
 import cv2
 
-net = cv2.dnn.readNet("yolov2-tiny.weights","custom.cfg")
+net = cv2.dnn.readNet("yolov4-tiny.weights","newCustom.cfg")
 layer_names = net.getLayerNames()
 print(layer_names[32])
 # output_layer_idx = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 # print("here",output_layer_idx);
 output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 
-cap = cv2.VideoCapture("test1.mp4")
-
+cap = cv2.VideoCapture("test4.mp4")
+classess = []
+with open('coco.names', 'r') as f:
+    classess = [line.strip() for line in f.readlines()]
 
 while True:
     # Read a frame from the video
@@ -22,7 +24,7 @@ while True:
     # Perform forward propagation
     net.setInput(blob)
     outputs = net.forward(output_layers)
-
+    print(outputs)
     # Extract the bounding boxes, confidences, and class IDs
     boxes = []
     confidences = []
@@ -33,6 +35,7 @@ while True:
             scores = detection[5:]
             class_id = np.argmax(scores)
             
+
             confidence = scores[class_id]
             if confidence > 0.5:
                 # Object detected
@@ -45,6 +48,7 @@ while True:
                 boxes.append([x, y, w, h])
                 confidences.append(float(confidence))
                 class_ids.append(class_id)
+                print(class_id)
 
     # Perform non-maximum suppression to eliminate overlapping boxes
     indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
@@ -54,7 +58,8 @@ while True:
     for i in range(len(boxes)):
         if i in indexes:
             x, y, w, h = boxes[i]
-            label = "Car"
+            label = f"{classess[class_ids[i]]}: {confidences[i]:.2f}"
+            
             color = (0, 255, 0)
             cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
             cv2.putText(frame, label, (x, y - 10), font, 1, color, 2)
