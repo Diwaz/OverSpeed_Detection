@@ -4,12 +4,13 @@ import math
 
 net = cv2.dnn.readNet("yolov4-tiny.weights", "newCustom.cfg")
 layer_names = net.getLayerNames()
-print(layer_names[32])
+print(layer_names)
 # output_layer_idx = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 # print("here",output_layer_idx);
 output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 
-cap = cv2.VideoCapture("test4.mp4")
+cap = cv2.VideoCapture("test3.mp4")
+
 classess = []
 with open('coco.names', 'r') as f:
     classess = [line.strip() for line in f.readlines()]
@@ -35,21 +36,20 @@ while True:
              (652, 3),
              (654, 717),
              (1272, 714)]
-    area2 = [(970, 322),
-             (743, 403),
-             (853, 672),
-             (1269, 426)]
+    area2 = [(512, 274),
+             (222, 648),
+             (1250, 624),
+             (1066, 279)]
     area3 = [
         (1092, 288),
         (667, 416),
         (700, 698),
         (1273, 406)
     ]
-    cv2.polylines(frame, [np.array(area3, np.int32)], True, (255, 0, 0), 6)
-    cv2.polylines(frame, [np.array(area1, np.int32)], True, (155, 0, 0), 6)
+    # cv2.polylines(frame, [np.array(area3, np.int32)], True, (255, 0, 0), 6)
+    # cv2.polylines(frame, [np.array(area2, np.int32)], True, (155, 0, 0), 6)
     # cv2.rectangle(frame, (650, 00), (1279, 750), (0, 255, 0), 2)
     # cv2.rectangle(frame, (650, 700), (1250, 350), (0, 255, 0), 2)
-
     center_points_cur_frame = []
     count += 1
     # Create a 4D blob from the frame
@@ -95,6 +95,8 @@ while True:
             cy = int((y+y+h)/2)
             center_points_cur_frame.append((cx, cy))
             label = f"{classess[class_ids[i]]}"
+            result = cv2.pointPolygonTest(
+                np.array(area3, np.int32), (int(cx), int(cy)), False)
 
             color = (0, 255, 0)
             cv2.circle(frame, (cx, cy), 3, (0, 0, 255), -1)
