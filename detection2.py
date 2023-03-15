@@ -28,6 +28,7 @@ track_id = 0
 detectSpeed = {}
 vehicles_entered = set()
 vE = []
+vehicles_entering = {}
 
 
 def trackM(e, x, y, f, p):
@@ -74,7 +75,6 @@ while True:
     boxes = []
     confidences = []
     class_ids = []
-    vehicles_entering = {}
     vehicles_elapsed_time = {}
     for output in outputs:
 
@@ -150,20 +150,25 @@ while True:
             track_id += 1
 
         for object_id, pt in tracking_objects.items():
+            print(object_id)
+            if object_id not in vehicles_entering:
+                resultDown = cv2.pointPolygonTest(
+                    np.array(area2, np.int32), (pt[0], pt[1]), True)
+                cv2.circle(frame, pt, 5, (0, 0, 255), -1)
 
-            resultDown = cv2.pointPolygonTest(
-                np.array(area2, np.int32), (pt[0], pt[1]), True)
-            cv2.circle(frame, pt, 5, (0, 0, 255), -1)
+                if (resultDown > 0):
+                    # If not, record the current time as the entering time
+                    entering_time = time.time()
+                    vehicles_entering[object_id] = entering_time
+                    print(vehicles_entering)
+                if object_id in vehicles_entering:
+                    continue
 
-            if (resultDown > 0):
+                # if object_id not in vehicles_entered:
+                #     vehicles_entered.add(object_id)
+                #     vehicles_entering[object_id] = time.time()
 
-                if object_id not in vehicles_entering:
-                    print(object_id)
-                    vehicles_entering[object_id] = time.time()
-                else:
-                    print('already', object_id)
-
-                print(vehicles_entering)
+                # print(vehicles_entering)
             # # skip if the object ID is already processed in the current frame
             # if object_id in vE:
             #     continue
