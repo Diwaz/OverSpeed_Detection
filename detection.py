@@ -36,6 +36,7 @@ vehicles_entered = set()
 vE = []
 vehicles_entering = {}
 speeding_vehicles = {}
+vehicles_captured = {}
 frameNumber = 0
 locate = []
 
@@ -60,27 +61,22 @@ def rescale_frame(frame, percent=75):
     return cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
 
 
-interpolation_flags = [flag for flag in dir(cv2) if flag.startswith('INTER_')]
-
-# Check if cv2.INTER_AREA is present in the list
-if 'INTER_AREA' in interpolation_flags:
-    print('cv2.INTER_AREA is present in your OpenCV installation')
-else:
-    print('cv2.INTER_AREA is not present in your OpenCV installation')
-
 while True:
     frameNumber += 1
     # Read a frame from the video
 
     ret, frame = cap.read()
 
-    clean_frame = frame
+    clean_frame = frame.copy()
+    displayFrame = frame.copy()
 
     frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
     # clean_frame = rescale_frame(clean_frame, percent=33)
     # cv2.imshow('rescale', clean_frame)
     clean_frame = cv2.resize(clean_frame, (1280, 720),
                              interpolation=cv2.INTER_AREA)
+    displayFrame = cv2.resize(displayFrame, (1280, 720),
+                              interpolation=cv2.INTER_AREA)
     # video 9 small poly
     # area1 = [(511, 280),
     #          (1065, 282),
@@ -133,8 +129,10 @@ while True:
     # Perform forward propagation
     net.setInput(blob)
     outputs = net.forward(output_layers)
-    cv2.polylines(frame, [np.array(area2, np.int32)], True, (255, 0, 0), 0, )
-    cv2.polylines(frame, [np.array(area1, np.int32)], True, (255, 0, 0), 0, )
+    cv2.polylines(displayFrame, [np.array(
+        area2, np.int32)], True, (255, 0, 0), 0, )
+    cv2.polylines(displayFrame, [np.array(
+        area1, np.int32)], True, (255, 0, 0), 0, )
    # print(outputs)
     # Extract the bounding boxes, confidences, and class IDs
     boxes = []
@@ -172,18 +170,20 @@ while True:
             cy = int((y+y+h)/2)
             center_points_cur_frame.append((cx, cy))
             label = f"{classess[class_ids[i]]}"
-            # result = cv2.pointPolygonTest(
-            #     np.array(area2, np.int32), (int(cx), int(cy)), False)
 
+            result = cv2.pointPolygonTest(
+                np.array(area1, np.int32), (int(cx), int(cy)), False)
             # cv2.circle(frame, (cx, cy), 3, (0, 0, 255), -1)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            if (result > 0):
+                cv2.rectangle(displayFrame, (x, y),
+                              (x + w, y + h), (0, 255, 0), 2)
             # cv2.putText(frame, label, (x, y - 10), font, 1, color, 2)
 
     if count <= 2:
         for pt in center_points_cur_frame:
             for pt2 in center_points_prev_frame:
                 distance = math.hypot(pt2[0] - pt[0], pt2[1] - pt[1])
-                print('dist', distance)
+                print(f'dist{object_id}', distance)
                 if distance < 250:
                     tracking_objects[track_id] = pt
                     track_id += 1
@@ -196,7 +196,8 @@ while True:
             object_exists = False
             for pt in center_points_cur_frame_copy:
                 distance = math.hypot(pt2[0] - pt[0], pt2[1] - pt[1])
-                print('dist', distance)
+                # print('---------------------------------------------')
+                # print(f'dist{object_id}', distance)
                 # Update IDs position
                 if distance < 250:
                     tracking_objects[object_id] = pt
@@ -215,17 +216,18 @@ while True:
             track_id += 1
 
         for object_id, pt in tracking_objects.items():
-            cv2.imwrite(
-                f'Testviolaters/vehicle_{object_id}.jpg', frame)
+            # cv2.imwrite(
+            #     f'Testviolaters/vehicle_{object_id}.jpg', displayFrame)
 
             resultDown = cv2.pointPolygonTest(
                 np.array(area1, np.int32), (pt[0], pt[1]), True)
-            cv2.circle(frame, pt, 5, (0, 0, 255), -1)
-            # cv2.putText(frame, str(object_id),
-            #             (pt[0], pt[1]+10), 0, 1, (255, 0, 0), 2)
+
             # skip if the object ID is already processed in the current frame
 
             if (resultDown > 0):
+                cv2.circle(displayFrame, pt, 5, (0, 0, 255), -1)
+                cv2.putText(displayFrame, str(object_id),
+                            (pt[0], pt[1]+10), 0, 1, (255, 0, 0), 2)
                 initial_time = time.time()
                 # vehicles_entering[object_id] = time.time()
 
@@ -246,66 +248,73 @@ while True:
 
                     # decimal_num = Decimal(vehicles_entering[object_id])
                     # float_num = float(decimal_num)
-                    elapsed_time = time.time() - \
-                        int(vehicles_entering[object_id])
-                    # print('E.T', vehicles_entering[object_id])
 
-                    if object_id not in vehicles_elapsed_time:
-                        vehicles_elapsed_time[object_id] = elapsed_time
+                    if object_id not in vehicles_captured:
+                        elapsed_time = time.time() - \
+                            int(vehicles_entering[object_id])
+                        vehicles_captured[object_id] = elapsed_time
 
-                    if object_id in vehicles_elapsed_time:
-                        elapsed_time = vehicles_elapsed_time[object_id]
+                    if object_id in vehicles_captured:
 
-                    # calculate speed
-                    distance = 1.5
-                    speed_ms = int(distance)/(elapsed_time*0.75)
-                    speed_kmph = int(speed_ms) * int(3.6)
+                        print(f'ET{object_id}  ', elapsed_time)
+                        # print('E.T', vehicles_entering[object_id])
 
-                    if object_id not in detectSpeed:
-                        detectSpeed[object_id] = speed_kmph
+                        if object_id not in vehicles_elapsed_time:
+                            vehicles_elapsed_time[object_id] = elapsed_time
 
-                    if speed_kmph > 60:
-                        # Store the vehicle's ID and speed in the speeding_vehicles dictionary
-                        speeding_vehicles[object_id] = speed_kmph
-                        # Capture a snapshot of the vehicle and save it locally
-                        # snapshot = clean_frame[int(pt[1]-50):int(pt[1]+50),
-                        #                        int(pt[0]-50):int(pt[0]+50)]
+                        if object_id in vehicles_elapsed_time:
+                            elapsed_time = vehicles_elapsed_time[object_id]
 
-                        # x-coordinate of top-left corner of bounding box
-                        x = int(pt[0] - 50)
-                        # y-coordinate of top-left corner of bounding box
-                        y = int(pt[1] - 50)
-                        w = 100  # width of bounding box
-                        h = 100  # height of bounding box
-                        # Get the frame at 5 seconds
-                       # Captureframe = video.get_frame(frameNumber)
+                        # calculate speed
+                        distance = 0.8
+                        speed_ms = int(distance)/(elapsed_time*0.75)
+                        speed_kmph = (speed_ms) * (3.6)
 
-                    # print(detectSpeed)
-                    cv2.circle(frame, pt, 5, (0, 0, 255), -1)
+                        if object_id not in detectSpeed:
+                            detectSpeed[object_id] = speed_kmph
 
-                    cv2.putText(frame, str(int(detectSpeed[object_id]))+" KMPH",
-                                (pt[0], pt[1] - 7), 0, 1, (0, 0, 255), 2)
+                        if speed_kmph > 60:
+                            # Store the vehicle's ID and speed in the speeding_vehicles dictionary
+                            speeding_vehicles[object_id] = speed_kmph
+                            # Capture a snapshot of the vehicle and save it locally
+                            # snapshot = clean_frame[int(pt[1]-50):int(pt[1]+50),
+                            #                        int(pt[0]-50):int(pt[0]+50)]
 
-                    cv2.circle(clean_frame, pt, 5, (0, 0, 255), -1)
+                            # x-coordinate of top-left corner of bounding box
+                            x = int(pt[0] - 50)
+                            # y-coordinate of top-left corner of bounding box
+                            y = int(pt[1] - 50)
+                            w = 100  # width of bounding box
+                            h = 100  # height of bounding box
+                            # Get the frame at 5 seconds
+                        # Captureframe = video.get_frame(frameNumber)
 
-                    cv2.putText(clean_frame, str(int(detectSpeed[object_id]))+" KMPH",
-                                (pt[0], pt[1] - 7), 0, 1, (0, 0, 255), 2)
+                        # print(detectSpeed)
+                        cv2.circle(displayFrame, pt, 5, (0, 0, 255), -1)
 
-                    cv2.putText(clean_frame, str(object_id),
-                                (pt[0], pt[1]+10), 0, 1, (255, 0, 0), 2)
-                    timeStamp = frameNumber/frame_rate
-                    # locate.append([timeStamp, [x, y, w, h]])
-                    # print(locate)
-                    # print('timestamp', timeStamp)
-                    snapshot = clean_frame
-                    # cv2.imwrite(
-                    #     f"violaters/frame_{object_id}.jpg", Captureframe)
+                        cv2.putText(displayFrame, str(int(detectSpeed[object_id]))+" KMPH",
+                                    (pt[0], pt[1] - 7), 0, 1, (0, 0, 255), 2)
 
-                    cv2.imwrite(
-                        f'violaters/vehicle_{object_id}_speed_{speed_kmph}.jpg', snapshot)
+                        cv2.circle(clean_frame, pt, 5, (0, 0, 255), -1)
+
+                        cv2.putText(clean_frame, str(int(detectSpeed[object_id]))+" KMPH",
+                                    (pt[0], pt[1] - 7), 0, 1, (0, 0, 255), 2)
+
+                        cv2.putText(clean_frame, str(object_id),
+                                    (pt[0], pt[1]+10), 0, 1, (255, 0, 0), 2)
+                        timeStamp = frameNumber/frame_rate
+                        # locate.append([timeStamp, [x, y, w, h]])
+                        # print(locate)
+                        # print('timestamp', timeStamp)
+                        snapshot = clean_frame
+                        # cv2.imwrite(
+                        #     f"violaters/frame_{object_id}.jpg", Captureframe)
+
+                        cv2.imwrite(
+                            f'violaters/vehicle_{object_id}_speed_{speed_kmph}.jpg', snapshot)
 
     # Show the output frame
-    cv2.imshow("Video", frame)
+    cv2.imshow("Video", displayFrame)
     cv2.setMouseCallback('Video', trackM)
     center_point_prevFrame = center_points_cur_frame.copy()
 
